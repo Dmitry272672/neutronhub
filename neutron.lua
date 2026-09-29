@@ -1,4 +1,3 @@
--- NEUTRON HUB | Mobile Script
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -11,6 +10,7 @@ local LocalPlayer = Players.LocalPlayer
 local IMAGE_URL = "rbxassetid://138823883244540"
 local TG_LINK = "t.me/neutron_client"
 
+-- ============ АВТО-МАСШТАБ ПОД РАЗРЕШЕНИЕ ============
 local SCALE = 1
 local screenResText = "0x0"
 
@@ -25,17 +25,31 @@ local function getScale()
 end
 
 SCALE = getScale()
-Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function() SCALE = getScale() end)
+
+Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+    SCALE = getScale()
+end)
 
 local Config = {
     ESP = {
-        Enabled = false, Box = true, Name = false, Distance = false,
-        Health = false, Tracer = false, Skeleton = false, Head = false,
+        Enabled     = false,
+        Box         = true,
+        Name        = false,
+        Distance    = false,
+        Health      = false,
+        Tracer      = false,
+        Skeleton    = false,
+        Head        = false,
         MaxDistance = 500,
     },
     Aimbot = {
-        Enabled = false, Smoothness = 8, FOV = 60,
-        VisibleOnly = true, TargetPart = "Torso",
+        Enabled     = false,
+        Smoothness  = 8,
+        FOV         = 60,
+        VisibleOnly = true,
+        TargetPart  = "Torso",
+        ReactionDelay = 0.15,
+        AimJitter   = 0.008,
     },
 }
 
@@ -43,31 +57,48 @@ local ESPObjects = {}
 local FOVCircle = nil
 local Open = true
 local CompletelyClosed = false
+local aimStartTime = 0
+local aiming = false
 
 local function resolveTargetPart(char, targetName)
     if not char then return nil end
-    if targetName == "Head" then return char:FindFirstChild("Head") end
-    if targetName == "Torso" then
-        return char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
-            or char:FindFirstChild("LowerTorso") or char:FindFirstChild("HumanoidRootPart")
+    if targetName == "Head" then
+        return char:FindFirstChild("Head")
+    elseif targetName == "Torso" then
+        return char:FindFirstChild("UpperTorso")
+            or char:FindFirstChild("Torso")
+            or char:FindFirstChild("LowerTorso")
+            or char:FindFirstChild("HumanoidRootPart")
     end
     return char:FindFirstChild(targetName)
 end
 
+-- ============ ESP ============
 local SKELETON_BONES = {
-    {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},{"UpperTorso","LeftUpperArm"},
-    {"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},{"UpperTorso","RightUpperArm"},
-    {"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},{"LowerTorso","LeftUpperLeg"},
-    {"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},{"LowerTorso","RightUpperLeg"},
-    {"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "LowerTorso"},
+    {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"},
 }
 
-local function isR15(c) return c:FindFirstChild("UpperTorso") ~= nil end
+local function isR15(char)
+    return char:FindFirstChild("UpperTorso") ~= nil
+end
 
 local function makeLine()
     local l = Drawing.new("Line")
     l.Thickness = math.max(1, math.floor(1.5 * SCALE))
-    l.Color = Color3.fromRGB(255,255,255)
+    l.Color = Color3.fromRGB(255, 255, 255)
     l.Transparency = 1
     l.Visible = false
     return l
@@ -76,279 +107,435 @@ end
 local function createESP(player)
     if player == LocalPlayer then return end
     if ESPObjects[player] then return end
-    local d = {}
-    d.Box = Drawing.new("Square")
-    d.Box.Thickness = math.max(1, 1.5*SCALE)
-    d.Box.Color = Color3.fromRGB(0,255,200)
-    d.Box.Filled = false
-    d.Box.Transparency = 1
-    d.Box.Visible = false
-    d.Name = Drawing.new("Text")
-    d.Name.Size = math.floor(14*SCALE)
-    d.Name.Center = true
-    d.Name.Outline = true
-    d.Name.Color = Color3.fromRGB(255,255,255)
-    d.Name.Visible = false
-    d.Distance = Drawing.new("Text")
-    d.Distance.Size = math.floor(13*SCALE)
-    d.Distance.Center = true
-    d.Distance.Outline = true
-    d.Distance.Color = Color3.fromRGB(200,200,200)
-    d.Distance.Visible = false
-    d.HealthBG = makeLine()
-    d.HealthBG.Thickness = math.max(2, 3*SCALE)
-    d.HealthBG.Color = Color3.fromRGB(0,0,0)
-    d.HealthBar = makeLine()
-    d.HealthBar.Thickness = math.max(2, 3*SCALE)
-    d.HealthBar.Color = Color3.fromRGB(0,255,0)
-    d.Tracer = makeLine()
-    d.Tracer.Color = Color3.fromRGB(0,255,200)
-    d.SkeletonLines = {}
-    for i = 1, #SKELETON_BONES do d.SkeletonLines[i] = makeLine() end
-    d.HeadCircle = Drawing.new("Circle")
-    d.HeadCircle.Thickness = math.max(1, 1.5*SCALE)
-    d.HeadCircle.NumSides = 24
-    d.HeadCircle.Radius = 10*SCALE
-    d.HeadCircle.Filled = false
-    d.HeadCircle.Color = Color3.fromRGB(255,255,255)
-    d.HeadCircle.Transparency = 1
-    d.HeadCircle.Visible = false
-    ESPObjects[player] = d
+
+    local data = {}
+
+    data.Box = Drawing.new("Square")
+    data.Box.Thickness = math.max(1, 1.5 * SCALE)
+    data.Box.Color = Color3.fromRGB(0, 255, 200)
+    data.Box.Filled = false
+    data.Box.Transparency = 1
+    data.Box.Visible = false
+
+    data.Name = Drawing.new("Text")
+    data.Name.Size = math.floor(14 * SCALE)
+    data.Name.Center = true
+    data.Name.Outline = true
+    data.Name.Color = Color3.fromRGB(255, 255, 255)
+    data.Name.Visible = false
+
+    data.Distance = Drawing.new("Text")
+    data.Distance.Size = math.floor(13 * SCALE)
+    data.Distance.Center = true
+    data.Distance.Outline = true
+    data.Distance.Color = Color3.fromRGB(200, 200, 200)
+    data.Distance.Visible = false
+
+    data.HealthBG = makeLine()
+    data.HealthBG.Thickness = math.max(2, 3 * SCALE)
+    data.HealthBG.Color = Color3.fromRGB(0, 0, 0)
+
+    data.HealthBar = makeLine()
+    data.HealthBar.Thickness = math.max(2, 3 * SCALE)
+    data.HealthBar.Color = Color3.fromRGB(0, 255, 0)
+
+    data.Tracer = makeLine()
+    data.Tracer.Color = Color3.fromRGB(0, 255, 200)
+
+    data.SkeletonLines = {}
+    for i = 1, #SKELETON_BONES do
+        data.SkeletonLines[i] = makeLine()
+    end
+
+    data.HeadCircle = Drawing.new("Circle")
+    data.HeadCircle.Thickness = math.max(1, 1.5 * SCALE)
+    data.HeadCircle.NumSides = 24
+    data.HeadCircle.Radius = 10 * SCALE
+    data.HeadCircle.Filled = false
+    data.HeadCircle.Color = Color3.fromRGB(255, 255, 255)
+    data.HeadCircle.Transparency = 1
+    data.HeadCircle.Visible = false
+
+    ESPObjects[player] = data
 end
 
 local function removeESP(player)
-    local o = ESPObjects[player]
-    if not o then return end
-    for k, v in pairs(o) do
-        if typeof(v) == "table" then
-            for _, x in pairs(v) do pcall(function() x:Remove() end) end
+    local obj = ESPObjects[player]
+    if not obj then return end
+    for key, draw in pairs(obj) do
+        if typeof(draw) == "table" then
+            for _, d in pairs(draw) do
+                pcall(function() d:Remove() end)
+            end
         else
-            pcall(function() v:Remove() end)
+            pcall(function() draw:Remove() end)
         end
     end
     ESPObjects[player] = nil
 end
 
-local function hideAll(o)
-    o.Box.Visible = false
-    o.Name.Visible = false
-    o.Distance.Visible = false
-    o.HealthBG.Visible = false
-    o.HealthBar.Visible = false
-    o.Tracer.Visible = false
-    o.HeadCircle.Visible = false
-    for _, l in pairs(o.SkeletonLines) do l.Visible = false end
+local function hideAll(obj)
+    obj.Box.Visible = false
+    obj.Name.Visible = false
+    obj.Distance.Visible = false
+    obj.HealthBG.Visible = false
+    obj.HealthBar.Visible = false
+    obj.Tracer.Visible = false
+    obj.HeadCircle.Visible = false
+    for _, line in pairs(obj.SkeletonLines) do
+        line.Visible = false
+    end
 end
 
 local function makeBaseIgnore()
-    local t = {}
-    if LocalPlayer.Character then table.insert(t, LocalPlayer.Character) end
-    if Camera then table.insert(t, Camera) end
-    return t
+    local list = {}
+    if LocalPlayer.Character then table.insert(list, LocalPlayer.Character) end
+    if Camera then table.insert(list, Camera) end
+    return list
 end
 
-local function isVisible(tc)
-    if not tc or not LocalPlayer.Character then return false end
-    local mc = LocalPlayer.Character
-    local mh = mc:FindFirstChild("Head") or mc:FindFirstChild("HumanoidRootPart")
-    if not mh then return false end
-    local origin = mh.Position
-    local pts = {}
-    for _, n in ipairs({"Head","UpperTorso","Torso","LowerTorso","HumanoidRootPart"}) do
-        local p = tc:FindFirstChild(n)
-        if p then table.insert(pts, p.Position) end
+local function isVisible(targetChar)
+    if not targetChar then return false end
+    if not LocalPlayer.Character then return false end
+
+    local myChar = LocalPlayer.Character
+    local myHead = myChar:FindFirstChild("Head")
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+
+    local origin
+    if myHead then
+        origin = myHead.Position
+    elseif myRoot then
+        origin = myRoot.Position
+    else
+        origin = Camera.CFrame.Position
     end
-    if #pts == 0 then return false end
-    local il = makeBaseIgnore()
-    table.insert(il, tc)
-    local rp = RaycastParams.new()
-    rp.FilterDescendantsInstances = il
-    rp.FilterType = Enum.RaycastFilterType.Exclude
-    rp.IgnoreWater = true
-    for _, tp in ipairs(pts) do
-        if Workspace:Raycast(origin, tp - origin, rp) == nil then return true end
+
+    local targetPoints = {}
+    local h  = targetChar:FindFirstChild("Head")
+    local ut = targetChar:FindFirstChild("UpperTorso")
+    local lt = targetChar:FindFirstChild("LowerTorso")
+    local t  = targetChar:FindFirstChild("Torso")
+    local r  = targetChar:FindFirstChild("HumanoidRootPart")
+
+    if h  then table.insert(targetPoints, h.Position)  end
+    if ut then table.insert(targetPoints, ut.Position) end
+    if t  then table.insert(targetPoints, t.Position)  end
+    if lt then table.insert(targetPoints, lt.Position) end
+    if r  then table.insert(targetPoints, r.Position)  end
+
+    if #targetPoints == 0 then return false end
+
+    local ignoreList = makeBaseIgnore()
+    table.insert(ignoreList, targetChar)
+
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = ignoreList
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.IgnoreWater = true
+
+    for _, tp in ipairs(targetPoints) do
+        local result = Workspace:Raycast(origin, tp - origin, params)
+        if result == nil then
+            return true
+        end
     end
     return false
 end
 
-local function w2s(p)
-    local sp, on = Camera:WorldToViewportPoint(p)
-    if on then return Vector2.new(sp.X, sp.Y) end
+local function worldToScreen(pos)
+    local sp, onScreen = Camera:WorldToViewportPoint(pos)
+    if onScreen then
+        return Vector2.new(sp.X, sp.Y)
+    end
     return nil
 end
 
 local function getBodyFrame(char)
-    local h = char:FindFirstChild("Head")
-    local r = char:FindFirstChild("HumanoidRootPart")
-    if not h or not r then return nil end
-    local hp, hon = Camera:WorldToViewportPoint(h.Position)
-    if not hon then return nil end
-    local lowY = nil
-    for _, n in ipairs({"LeftFoot","RightFoot","LeftLowerLeg","RightLowerLeg","LeftLeg","RightLeg","LowerTorso","Torso","HumanoidRootPart"}) do
-        local p = char:FindFirstChild(n)
-        if p then
-            local sp, on = Camera:WorldToViewportPoint(p.Position)
-            if on and (lowY == nil or sp.Y > lowY) then lowY = sp.Y end
+    local head = char:FindFirstChild("Head")
+    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    if not head or not hrp then return nil end
+
+    local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position)
+    if not headOnScreen then return nil end
+
+    local lowestY = nil
+    local lowestPos = nil
+
+    local lowerCandidates = {
+        "LeftFoot", "RightFoot",
+        "LeftLowerLeg", "RightLowerLeg",
+        "LeftLeg", "RightLeg",
+        "LowerTorso", "Torso",
+        "HumanoidRootPart",
+    }
+
+    for _, name in ipairs(lowerCandidates) do
+        local part = char:FindFirstChild(name)
+        if part then
+            local sp, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                if lowestY == nil or sp.Y > lowestY then
+                    lowestY = sp.Y
+                    lowestPos = sp
+                end
+            end
         end
     end
-    if not lowY then
-        local sp, on = Camera:WorldToViewportPoint(r.Position)
-        if on then lowY = sp.Y else return nil end
+
+    if not lowestPos then
+        local sp, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+        if onScreen then
+            lowestPos = sp
+            lowestY = sp.Y
+        else
+            return nil
+        end
     end
-    local hgt = math.abs(lowY - hp.Y)
-    if hgt < 4 then hgt = 6*SCALE end
-    local w = hgt * 0.55
-    local cx = hp.X
+
+    local height = math.abs(lowestY - headPos.Y)
+    if height < 4 then
+        height = 6 * SCALE
+    end
+
+    local width = height * 0.55
+    local centerX = headPos.X
+
+    local top = Vector2.new(centerX - width / 2, headPos.Y)
+    local bottom = Vector2.new(centerX + width / 2, headPos.Y + height)
+
     return {
-        top = Vector2.new(cx - w/2, hp.Y),
-        bottom = Vector2.new(cx + w/2, hp.Y + hgt),
-        centerX = cx, height = hgt,
+        top = top,
+        bottom = bottom,
+        centerX = centerX,
+        height = height,
+        width = width,
     }
 end
 
 local function updateESP()
-    for p, o in pairs(ESPObjects) do
-        if not Config.ESP.Enabled then hideAll(o); continue end
-        local c = p.Character
-        if not c then hideAll(o); continue end
-        local r = c:FindFirstChild("HumanoidRootPart")
-        local hum = c:FindFirstChildOfClass("Humanoid")
-        if not r or not hum or hum.Health <= 0 then hideAll(o); continue end
-        local dist = (Camera.CFrame.Position - r.Position).Magnitude
-        if dist > Config.ESP.MaxDistance then hideAll(o); continue end
-        local f = getBodyFrame(c)
-        if f then
-            local t = f.top
-            local b = f.bottom
+    for player, obj in pairs(ESPObjects) do
+        if not Config.ESP.Enabled then hideAll(obj); continue end
+
+        local char = player.Character
+        if not char then hideAll(obj); continue end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum or hum.Health <= 0 then hideAll(obj); continue end
+
+        local distance = (Camera.CFrame.Position - hrp.Position).Magnitude
+        if distance > Config.ESP.MaxDistance then hideAll(obj); continue end
+
+        local frame = getBodyFrame(char)
+
+        if frame then
+            local top = frame.top
+            local bottom = frame.bottom
+
             if Config.ESP.Box then
-                o.Box.Size = Vector2.new(b.X - t.X, b.Y - t.Y)
-                o.Box.Position = t
-                o.Box.Visible = true
-            else o.Box.Visible = false end
-            if Config.ESP.Name then
-                o.Name.Text = p.Name
-                o.Name.Position = Vector2.new(f.centerX, t.Y - 20*SCALE)
-                o.Name.Visible = true
-            else o.Name.Visible = false end
-            if Config.ESP.Distance then
-                o.Distance.Text = string.format("[%d m]", math.floor(dist))
-                o.Distance.Position = Vector2.new(f.centerX, b.Y + 2*SCALE)
-                o.Distance.Visible = true
-            else o.Distance.Visible = false end
-            if Config.ESP.Health then
-                local pc = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
-                local bh = b.Y - t.Y
-                local off = 6*SCALE
-                o.HealthBG.From = Vector2.new(t.X - off, t.Y)
-                o.HealthBG.To = Vector2.new(t.X - off, b.Y)
-                o.HealthBG.Visible = true
-                o.HealthBar.From = Vector2.new(t.X - off, b.Y - bh * pc)
-                o.HealthBar.To = Vector2.new(t.X - off, b.Y)
-                o.HealthBar.Color = Color3.fromRGB(math.floor(255*(1-pc)), math.floor(255*pc), 0)
-                o.HealthBar.Visible = true
+                obj.Box.Size = Vector2.new(bottom.X - top.X, bottom.Y - top.Y)
+                obj.Box.Position = top
+                obj.Box.Thickness = math.max(1, 1.5 * SCALE)
+                obj.Box.Visible = true
             else
-                o.HealthBar.Visible = false
-                o.HealthBG.Visible = false
+                obj.Box.Visible = false
             end
+
+            if Config.ESP.Name then
+                obj.Name.Text = player.Name
+                obj.Name.Size = math.floor(14 * SCALE)
+                obj.Name.Position = Vector2.new(frame.centerX, top.Y - 20 * SCALE)
+                obj.Name.Visible = true
+            else
+                obj.Name.Visible = false
+            end
+
+            if Config.ESP.Distance then
+                obj.Distance.Text = string.format("[%d m]", math.floor(distance))
+                obj.Distance.Size = math.floor(13 * SCALE)
+                obj.Distance.Position = Vector2.new(frame.centerX, bottom.Y + 2 * SCALE)
+                obj.Distance.Visible = true
+            else
+                obj.Distance.Visible = false
+            end
+
+            if Config.ESP.Health then
+                local pct = hum.Health / math.max(hum.MaxHealth, 1)
+                if pct < 0 then pct = 0 end
+                if pct > 1 then pct = 1 end
+
+                local barHeight = bottom.Y - top.Y
+                local offset = 6 * SCALE
+
+                obj.HealthBG.Thickness = math.max(2, 3 * SCALE)
+                obj.HealthBG.From = Vector2.new(top.X - offset, top.Y)
+                obj.HealthBG.To   = Vector2.new(top.X - offset, bottom.Y)
+                obj.HealthBG.Visible = true
+
+                obj.HealthBar.Thickness = math.max(2, 3 * SCALE)
+                obj.HealthBar.From = Vector2.new(top.X - offset, bottom.Y - barHeight * pct)
+                obj.HealthBar.To   = Vector2.new(top.X - offset, bottom.Y)
+                obj.HealthBar.Color = Color3.fromRGB(
+                    math.floor(255 * (1 - pct)),
+                    math.floor(255 * pct),
+                    0
+                )
+                obj.HealthBar.Visible = true
+            else
+                obj.HealthBar.Visible = false
+                obj.HealthBG.Visible = false
+            end
+
             if Config.ESP.Tracer then
-                o.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                o.Tracer.To = Vector2.new(f.centerX, b.Y)
-                o.Tracer.Visible = true
-            else o.Tracer.Visible = false end
+                obj.Tracer.Thickness = math.max(1, 1.5 * SCALE)
+                obj.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                obj.Tracer.To   = Vector2.new(frame.centerX, bottom.Y)
+                obj.Tracer.Visible = true
+            else
+                obj.Tracer.Visible = false
+            end
         else
-            o.Box.Visible = false
-            o.Name.Visible = false
-            o.Distance.Visible = false
-            o.HealthBar.Visible = false
-            o.HealthBG.Visible = false
-            o.Tracer.Visible = false
+            obj.Box.Visible = false
+            obj.Name.Visible = false
+            obj.Distance.Visible = false
+            obj.HealthBar.Visible = false
+            obj.HealthBG.Visible = false
+            obj.Tracer.Visible = false
         end
-        if Config.ESP.Skeleton and isR15(c) then
+
+        if Config.ESP.Skeleton and isR15(char) then
             for i, bone in ipairs(SKELETON_BONES) do
-                local a = c:FindFirstChild(bone[1])
-                local b = c:FindFirstChild(bone[2])
-                local line = o.SkeletonLines[i]
+                local a = char:FindFirstChild(bone[1])
+                local b = char:FindFirstChild(bone[2])
+                local line = obj.SkeletonLines[i]
                 if a and b then
-                    local pa = w2s(a.Position)
-                    local pb = w2s(b.Position)
+                    local pa = worldToScreen(a.Position)
+                    local pb = worldToScreen(b.Position)
                     if pa and pb then
                         line.From = pa
                         line.To = pb
+                        line.Thickness = math.max(1, 1.5 * SCALE)
                         line.Visible = true
-                    else line.Visible = false end
-                else line.Visible = false end
+                    else
+                        line.Visible = false
+                    end
+                else
+                    line.Visible = false
+                end
             end
         else
-            for _, l in pairs(o.SkeletonLines) do l.Visible = false end
+            for _, line in pairs(obj.SkeletonLines) do
+                line.Visible = false
+            end
         end
+
         if Config.ESP.Head then
-            local hd = c:FindFirstChild("Head")
-            if hd then
-                local pt = w2s(hd.Position)
-                if pt and f then
-                    o.HeadCircle.Position = pt
-                    o.HeadCircle.Radius = math.max(f.height * 0.16, 8*SCALE)
-                    o.HeadCircle.Visible = true
-                else o.HeadCircle.Visible = false end
-            else o.HeadCircle.Visible = false end
-        else o.HeadCircle.Visible = false end
+            local head = char:FindFirstChild("Head")
+            if head then
+                local p = worldToScreen(head.Position)
+                if p and frame then
+                    local headSize = frame.height * 0.16
+                    obj.HeadCircle.Position = p
+                    obj.HeadCircle.Radius = math.max(headSize, 8 * SCALE)
+                    obj.HeadCircle.Thickness = math.max(1, 1.5 * SCALE)
+                    obj.HeadCircle.Visible = true
+                else
+                    obj.HeadCircle.Visible = false
+                end
+            else
+                obj.HeadCircle.Visible = false
+            end
+        else
+            obj.HeadCircle.Visible = false
+        end
     end
 end
 
+-- ============ AIMBOT ============
 local function getClosestTarget()
-    local closest, sDist = nil, math.huge
-    local cn = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    for _, p in pairs(Players:GetPlayers()) do
-        if p == LocalPlayer then continue end
-        local c = p.Character
-        if not c then continue end
-        local hum = c:FindFirstChildOfClass("Humanoid")
+    local closest, shortestDist = nil, math.huge
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
+
+        local char = player.Character
+        if not char then continue end
+        local hum = char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then continue end
-        local part = resolveTargetPart(c, Config.Aimbot.TargetPart)
+
+        local part = resolveTargetPart(char, Config.Aimbot.TargetPart)
         if not part then continue end
-        if Config.Aimbot.VisibleOnly and not isVisible(c) then continue end
-        local sp, on = Camera:WorldToViewportPoint(part.Position)
-        if not on then continue end
-        local d = (Vector2.new(sp.X, sp.Y) - cn).Magnitude
-        if d < sDist and d <= Config.Aimbot.FOV then sDist = d; closest = part end
+
+        if Config.Aimbot.VisibleOnly then
+            if not isVisible(char) then continue end
+        end
+
+        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+        if not onScreen then continue end
+
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+        if dist < shortestDist and dist <= Config.Aimbot.FOV then
+            shortestDist = dist
+            closest = part
+        end
     end
     return closest
 end
 
 local function doAimbot()
     if not Config.Aimbot.Enabled then return end
-    local t = getClosestTarget()
-    if not t then return end
-    local la = math.clamp(0.825 - (Config.Aimbot.Smoothness * 0.075), 0.05, 1)
-    local jit = 0.008
-    local tp = t.Position + Vector3.new((math.random()-0.5)*jit, (math.random()-0.5)*jit, (math.random()-0.5)*jit)
-    Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, tp), la)
+
+    if aiming then
+        if os.clock() - aimStartTime < Config.Aimbot.ReactionDelay then
+            return
+        end
+    end
+
+    local target = getClosestTarget()
+    if not target then return end
+
+    local lerpAmount = 0.825 - (Config.Aimbot.Smoothness * 0.075)
+    if lerpAmount < 0.05 then lerpAmount = 0.05 end
+    if lerpAmount > 1 then lerpAmount = 1 end
+
+    local jitter = Config.Aimbot.AimJitter
+    local targetPos = target.Position + Vector3.new(
+        (math.random() - 0.5) * jitter,
+        (math.random() - 0.5) * jitter,
+        (math.random() - 0.5) * jitter
+    )
+
+    local aimCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+    Camera.CFrame = Camera.CFrame:Lerp(aimCFrame, lerpAmount)
 end
 
 local function createFOVCircle()
     if FOVCircle then FOVCircle:Remove() end
     FOVCircle = Drawing.new("Circle")
-    FOVCircle.Thickness = math.max(1, 1.5*SCALE)
+    FOVCircle.Thickness = math.max(1, 1.5 * SCALE)
     FOVCircle.NumSides = 60
     FOVCircle.Radius = Config.Aimbot.FOV
     FOVCircle.Filled = false
-    FOVCircle.Color = Color3.fromRGB(0,255,200)
+    FOVCircle.Color = Color3.fromRGB(0, 255, 200)
     FOVCircle.Transparency = 0.7
     FOVCircle.Visible = false
 end
 createFOVCircle()
 
+-- ============ UI ============
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Neutron"
+ScreenGui.Name = "NeutronHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = (gethui and gethui()) or LocalPlayer:WaitForChild("PlayerGui")
 
 local ToggleBtn = Instance.new("ImageButton")
 ToggleBtn.Size = UDim2.new(0, 46, 0, 46)
 ToggleBtn.Position = UDim2.new(0, 12, 0.4, 0)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(15,15,20)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 ToggleBtn.BorderSizePixel = 0
 ToggleBtn.Image = IMAGE_URL
 ToggleBtn.ScaleType = Enum.ScaleType.Fit
@@ -357,10 +544,11 @@ ToggleBtn.Active = true
 ToggleBtn.Parent = ScreenGui
 
 local tbCorner = Instance.new("UICorner")
-tbCorner.CornerRadius = UDim.new(1,0)
+tbCorner.CornerRadius = UDim.new(1, 0)
 tbCorner.Parent = ToggleBtn
+
 local tbStroke = Instance.new("UIStroke")
-tbStroke.Color = Color3.fromRGB(0,255,200)
+tbStroke.Color = Color3.fromRGB(0, 255, 200)
 tbStroke.Thickness = 1.5
 tbStroke.Transparency = 0.3
 tbStroke.Parent = ToggleBtn
@@ -368,35 +556,38 @@ tbStroke.Parent = ToggleBtn
 local Main = Instance.new("Frame")
 Main.Size = UDim2.new(0, 260, 0, 330)
 Main.Position = UDim2.new(0.5, -130, 0.5, -165)
-Main.BackgroundColor3 = Color3.fromRGB(15,15,20)
+Main.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 Main.BorderSizePixel = 0
 Main.Active = true
 Main.ClipsDescendants = true
 Main.Parent = ScreenGui
 
 local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0,14)
+mainCorner.CornerRadius = UDim.new(0, 14)
 mainCorner.Parent = Main
+
 local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = Color3.fromRGB(0,255,200)
+mainStroke.Color = Color3.fromRGB(0, 255, 200)
 mainStroke.Thickness = 1.5
 mainStroke.Transparency = 0.4
 mainStroke.Parent = Main
 
 local TopBar = Instance.new("Frame")
+TopBar.Name = "DragBar"
 TopBar.Size = UDim2.new(1, 0, 0, 42)
-TopBar.BackgroundColor3 = Color3.fromRGB(22,22,30)
+TopBar.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
 TopBar.BorderSizePixel = 0
 TopBar.Active = true
 TopBar.Parent = Main
 
 local topCorner = Instance.new("UICorner")
-topCorner.CornerRadius = UDim.new(0,14)
+topCorner.CornerRadius = UDim.new(0, 14)
 topCorner.Parent = TopBar
+
 local topFix = Instance.new("Frame")
 topFix.Size = UDim2.new(1, 0, 0, 14)
 topFix.Position = UDim2.new(0, 0, 1, -14)
-topFix.BackgroundColor3 = Color3.fromRGB(22,22,30)
+topFix.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
 topFix.BorderSizePixel = 0
 topFix.Parent = TopBar
 
@@ -412,8 +603,8 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -160, 1, 0)
 Title.Position = UDim2.new(0, 42, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "NEUTRON"
-Title.TextColor3 = Color3.fromRGB(0,255,200)
+Title.Text = "NEUTRON HUB"
+Title.TextColor3 = Color3.fromRGB(0, 255, 200)
 Title.TextSize = 15
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -424,8 +615,8 @@ CloseBtn.Size = UDim2.new(0, 30, 0, 30)
 CloseBtn.Position = UDim2.new(1, -36, 0.5, -15)
 CloseBtn.BackgroundTransparency = 1
 CloseBtn.BorderSizePixel = 0
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255,90,90)
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 90, 90)
 CloseBtn.TextSize = 24
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.AutoButtonColor = false
@@ -436,297 +627,7 @@ MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
 MinimizeBtn.Position = UDim2.new(1, -84, 0.5, -15)
 MinimizeBtn.BackgroundTransparency = 1
 MinimizeBtn.BorderSizePixel = 0
-MinimizeBtn.Text = "-"
-MinimizeBtn.TextColor3 = Color3.fromRGB(200,200,200)
+MinimizeBtn.Text = "—"
+MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 MinimizeBtn.TextSize = 24
-MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.AutoButtonColor = false
-MinimizeBtn.Parent = TopBar
-
-local TabsFrame = Instance.new("Frame")
-TabsFrame.Size = UDim2.new(0, 72, 1, -50)
-TabsFrame.Position = UDim2.new(0, 6, 0, 46)
-TabsFrame.BackgroundColor3 = Color3.fromRGB(18,18,24)
-TabsFrame.BorderSizePixel = 0
-TabsFrame.Parent = Main
-
-local tabsCorner = Instance.new("UICorner")
-tabsCorner.CornerRadius = UDim.new(0,10)
-tabsCorner.Parent = TabsFrame
-local TabsList = Instance.new("UIListLayout")
-TabsList.Padding = UDim.new(0, 4)
-TabsList.SortOrder = Enum.SortOrder.LayoutOrder
-TabsList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-TabsList.Parent = TabsFrame
-local TabsPad = Instance.new("UIPadding")
-TabsPad.PaddingTop = UDim.new(0, 8)
-TabsPad.Parent = TabsFrame
-
-local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, -88, 1, -50)
-Content.Position = UDim2.new(0, 82, 0, 46)
-Content.BackgroundTransparency = 1
-Content.ClipsDescendants = true
-Content.Parent = Main
-
-local btnDragging = false
-local btnDragStart = nil
-local btnStartPos = nil
-local btnMoved = false
-
-local function btnUpdateDrag(input)
-    local delta = input.Position - btnDragStart
-    if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then btnMoved = true end
-    ToggleBtn.Position = UDim2.new(
-        btnStartPos.X.Scale, btnStartPos.X.Offset + delta.X,
-        btnStartPos.Y.Scale, btnStartPos.Y.Offset + delta.Y
-    )
-end
-
-ToggleBtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then
-        btnDragging = true
-        btnMoved = false
-        btnDragStart = input.Position
-        btnStartPos = ToggleBtn.Position
-    end
-end)
-ToggleBtn.InputChanged:Connect(function(input)
-    if btnDragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-    or input.UserInputType == Enum.UserInputType.Touch) then btnUpdateDrag(input) end
-end)
-ToggleBtn.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then btnDragging = false end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if btnDragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-    or input.UserInputType == Enum.UserInputType.Touch) then btnUpdateDrag(input) end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then btnDragging = false end
-end)
-
-local menuDragging = false
-local menuDragStart = nil
-local menuStartPos = nil
-
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then
-        menuDragging = true
-        menuDragStart = input.Position
-        menuStartPos = Main.Position
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if menuDragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-    or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - menuDragStart
-        Main.Position = UDim2.new(
-            menuStartPos.X.Scale, menuStartPos.X.Offset + delta.X,
-            menuStartPos.Y.Scale, menuStartPos.Y.Offset + delta.Y
-        )
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then menuDragging = false end
-end)
-
-local function makeTab(name)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 34)
-    btn.BackgroundColor3 = Color3.fromRGB(25,25,33)
-    btn.BorderSizePixel = 0
-    btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(200,200,200)
-    btn.TextSize = 13
-    btn.Font = Enum.Font.GothamBold
-    btn.AutoButtonColor = false
-    btn.Parent = TabsFrame
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0,8)
-    c.Parent = btn
-    local page = Instance.new("ScrollingFrame")
-    page.Size = UDim2.new(1, 0, 1, 0)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel = 0
-    page.ScrollBarThickness = 3
-    page.ScrollBarImageColor3 = Color3.fromRGB(0,255,200)
-    page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.Visible = false
-    page.Parent = Content
-    local l = Instance.new("UIListLayout")
-    l.Padding = UDim.new(0, 5)
-    l.SortOrder = Enum.SortOrder.LayoutOrder
-    l.Parent = page
-    local pd = Instance.new("UIPadding")
-    pd.PaddingTop = UDim.new(0, 4)
-    pd.PaddingRight = UDim.new(0, 6)
-    pd.PaddingBottom = UDim.new(0, 4)
-    pd.Parent = page
-    return {Button = btn, Page = page}
-end
-
-local Visual = makeTab("ESP")
-local Combat = makeTab("AIM")
-local Misc = makeTab("MISC")
-local allTabs = {Visual, Combat, Misc}
-
-local function selectTab(tab)
-    for _, t in pairs(allTabs) do
-        t.Page.Visible = false
-        TweenService:Create(t.Button, TweenInfo.new(0.15), {
-            BackgroundColor3 = Color3.fromRGB(25,25,33),
-            TextColor3 = Color3.fromRGB(200,200,200),
-        }):Play()
-    end
-    tab.Page.Visible = true
-    TweenService:Create(tab.Button, TweenInfo.new(0.15), {
-        BackgroundColor3 = Color3.fromRGB(0,255,200),
-        TextColor3 = Color3.fromRGB(15,15,20),
-    }):Play()
-end
-
-Visual.Button.MouseButton1Click:Connect(function() selectTab(Visual) end)
-Combat.Button.MouseButton1Click:Connect(function() selectTab(Combat) end)
-Misc.Button.MouseButton1Click:Connect(function() selectTab(Misc) end)
-selectTab(Visual)
-
-local function addToggle(parent, text, default, callback)
-    local holder = Instance.new("Frame")
-    holder.Size = UDim2.new(1, 0, 0, 34)
-    holder.BackgroundColor3 = Color3.fromRGB(22,22,30)
-    holder.BorderSizePixel = 0
-    holder.Parent = parent.Page
-    local hc = Instance.new("UICorner")
-    hc.CornerRadius = UDim.new(0,8)
-    hc.Parent = holder
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -60, 1, 0)
-    lbl.Position = UDim2.new(0, 10, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(220,220,220)
-    lbl.TextSize = 12
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = holder
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0, 40, 0, 20)
-    toggle.Position = UDim2.new(1, -50, 0.5, -10)
-    toggle.BackgroundColor3 = Color3.fromRGB(40,40,50)
-    toggle.BorderSizePixel = 0
-    toggle.Text = ""
-    toggle.AutoButtonColor = false
-    toggle.Parent = holder
-    local tc = Instance.new("UICorner")
-    tc.CornerRadius = UDim.new(1,0)
-    tc.Parent = toggle
-    local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 16, 0, 16)
-    knob.Position = UDim2.new(0, 2, 0.5, -8)
-    knob.BackgroundColor3 = Color3.fromRGB(200,200,200)
-    knob.BorderSizePixel = 0
-    knob.Parent = toggle
-    local kc = Instance.new("UICorner")
-    kc.CornerRadius = UDim.new(1,0)
-    kc.Parent = knob
-    local state = default or false
-    local function refresh()
-        if state then
-            TweenService:Create(toggle, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(0,255,200) }):Play()
-            TweenService:Create(knob, TweenInfo.new(0.15), {
-                Position = UDim2.new(1, -18, 0.5, -8),
-                BackgroundColor3 = Color3.fromRGB(15,15,20),
-            }):Play()
-        else
-            TweenService:Create(toggle, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(40,40,50) }):Play()
-            TweenService:Create(knob, TweenInfo.new(0.15), {
-                Position = UDim2.new(0, 2, 0.5, -8),
-                BackgroundColor3 = Color3.fromRGB(200,200,200),
-            }):Play()
-        end
-    end
-    refresh()
-    toggle.MouseButton1Click:Connect(function()
-        state = not state
-        refresh()
-        if callback then callback(state) end
-    end)
-end
-
-local function addSlider(parent, text, max, min, default, callback)
-    local holder = Instance.new("Frame")
-    holder.Size = UDim2.new(1, 0, 0, 48)
-    holder.BackgroundColor3 = Color3.fromRGB(22,22,30)
-    holder.BorderSizePixel = 0
-    holder.Parent = parent.Page
-    local hc = Instance.new("UICorner")
-    hc.CornerRadius = UDim.new(0,8)
-    hc.Parent = holder
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -60, 0, 20)
-    lbl.Position = UDim2.new(0, 10, 0, 4)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(220,220,220)
-    lbl.TextSize = 12
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = holder
-    local valLbl = Instance.new("TextLabel")
-    valLbl.Size = UDim2.new(0, 50, 0, 20)
-    valLbl.Position = UDim2.new(1, -56, 0, 4)
-    valLbl.BackgroundTransparency = 1
-    valLbl.Text = tostring(default)
-    valLbl.TextColor3 = Color3.fromRGB(0,255,200)
-    valLbl.TextSize = 12
-    valLbl.Font = Enum.Font.GothamBold
-    valLbl.TextXAlignment = Enum.TextXAlignment.Right
-    valLbl.Parent = holder
-    local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(1, -20, 0, 6)
-    bar.Position = UDim2.new(0, 10, 0, 30)
-    bar.BackgroundColor3 = Color3.fromRGB(40,40,50)
-    bar.BorderSizePixel = 0
-    bar.Parent = holder
-    local bc = Instance.new("UICorner")
-    bc.CornerRadius = UDim.new(1,0)
-    bc.Parent = bar
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(0,255,200)
-    fill.BorderSizePixel = 0
-    fill.Parent = bar
-    local fc = Instance.new("UICorner")
-    fc.CornerRadius = UDim.new(1,0)
-    fc.Parent = fill
-    local drag = false
-    local function upd(input)
-        local rel = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
-        local cur = math.floor(min + (max - min) * rel + 0.5)
-        valLbl.Text = tostring(cur)
-        fill.Size = UDim2.new(rel, 0, 1, 0)
-        if callback then callback(cur) end
-    end
-    bar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            drag = true
-            upd(input)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if drag and (input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch) then upd(input) end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then drag = false end
-    end)
-end
+MinimizeBtn.Font = Enum.Font.
