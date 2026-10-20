@@ -8,7 +8,7 @@ local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 local IMAGE_URL = "rbxassetid://138823883244540"
-local TG_LINK = "t.me/neutron_client"
+local TG_LINK = "t.me/Neutron016" -- ИСПРАВЛЕННАЯ ССЫЛКА
 
 local SCALE = 1
 local screenResText = "0x0"
@@ -374,7 +374,7 @@ end
 createFOVCircle()
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Neutron"
+ScreenGui.Name = "Neutron I decay"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.DisplayOrder = 999
@@ -457,7 +457,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -160, 1, 0)
 Title.Position = UDim2.new(0, 42, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "NEUTRON"
+Title.Text = "NEUTRON I DECAY"
 Title.TextColor3 = CLR_ACCENT
 Title.TextSize = 15
 Title.Font = Enum.Font.GothamBold
@@ -1159,4 +1159,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("NEUTRON loaded!")
+print("NEUTRON I DECAY loaded!")
