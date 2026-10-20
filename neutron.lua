@@ -30,7 +30,7 @@ local Config = {
     ESP = {
         Enabled = false, Box = true, Name = false, Distance = false,
         Health = false, Tracer = false, Skeleton = false, Head = false,
-        MaxDistance = 500, VisibleCheck = false -- ДОБАВЛЕНО
+        MaxDistance = 500, VisibleCheck = false
     },
     Aimbot = {
         Enabled = false, Smoothness = 8, FOV = 60,
@@ -90,14 +90,14 @@ local function createESP(player)
     d.Name.Size = math.floor(14*SCALE)
     d.Name.Center = true
     d.Name.Outline = true
-    d.Name.Color = Color3.fromRGB(255,255,255) -- Имя всегда белое
+    d.Name.Color = Color3.fromRGB(255,255,255)
     d.Name.Visible = false
     
     d.Distance = Drawing.new("Text")
     d.Distance.Size = math.floor(13*SCALE)
     d.Distance.Center = true
     d.Distance.Outline = true
-    d.Distance.Color = Color3.fromRGB(200,200,200) -- Дистанция всегда серая
+    d.Distance.Color = Color3.fromRGB(200,200,200)
     d.Distance.Visible = false
     
     d.HealthBG = makeLine()
@@ -106,7 +106,7 @@ local function createESP(player)
     
     d.HealthBar = makeLine()
     d.HealthBar.Thickness = math.max(2, 3*SCALE)
-    d.HealthBar.Color = Color3.fromRGB(255,255,255) -- ХП всегда белый
+    d.HealthBar.Color = Color3.fromRGB(255,255,255) 
     
     d.Tracer = makeLine()
     d.Tracer.Color = Color3.fromRGB(255,255,255) 
@@ -227,13 +227,12 @@ local function updateESP()
         
         local f = getBodyFrame(c)
         
-        -- ЛОГИКА ЦВЕТОВ (Только для боксов, скелета, трейсера)
-        local targetColor = Color3.fromRGB(255, 255, 255) -- По умолчанию белый
+        local targetColor = Color3.fromRGB(255, 255, 255) 
         if Config.ESP.VisibleCheck then
             if isVisible(c) then
-                targetColor = Color3.fromRGB(0, 255, 0) -- Виден (Зеленый)
+                targetColor = Color3.fromRGB(0, 255, 0)
             else
-                targetColor = Color3.fromRGB(255, 0, 0) -- За стеной (Красный)
+                targetColor = Color3.fromRGB(255, 0, 0)
             end
         end
         
@@ -241,11 +240,10 @@ local function updateESP()
             local t = f.top
             local b = f.bottom
             
-            -- Применяем цвета ТОЛЬКО к геометрии
             o.Box.Color = targetColor
             o.Tracer.Color = targetColor
-            for _, l in pairs(o.SkeletonLines) do l.Color = targetColor end
             o.HeadCircle.Color = targetColor
+            for _, l in pairs(o.SkeletonLines) do l.Color = targetColor end
             
             if Config.ESP.Box then
                 o.Box.Size = Vector2.new(b.X - t.X, b.Y - t.Y)
@@ -327,7 +325,6 @@ local function updateESP()
     end
 end
 
--- (ОСТАЛЬНАЯ ЧАСТЬ КОДА - AIMBOT, GUI, ТАБЫ)
 local function getClosestTarget()
     local closest, sDist = nil, math.huge
     local cn = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -370,7 +367,7 @@ local function createFOVCircle()
     FOVCircle.NumSides = 60
     FOVCircle.Radius = Config.Aimbot.FOV
     FOVCircle.Filled = false
-    FOVCircle.Color = Color3.fromRGB(255,255,255)
+    FOVCircle.Color = Color3.fromRGB(255,255,255) 
     FOVCircle.Transparency = 0.8
     FOVCircle.Visible = false
 end
@@ -383,7 +380,6 @@ ScreenGui.IgnoreGuiInset = true
 ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = (gethui and gethui()) or LocalPlayer:WaitForChild("PlayerGui")
 
--- ЧЕРНО-СЕРАЯ ПАЛИТРА
 local CLR_BG = Color3.fromRGB(15, 15, 15)
 local CLR_TOP = Color3.fromRGB(25, 25, 25)
 local CLR_TAB_BG = Color3.fromRGB(20, 20, 20)
@@ -835,7 +831,7 @@ addToggle(Visual, "Health Bar", false, function(s) Config.ESP.Health = s end)
 addToggle(Visual, "Tracer", false, function(s) Config.ESP.Tracer = s end)
 addToggle(Visual, "Skeleton", false, function(s) Config.ESP.Skeleton = s end)
 addToggle(Visual, "Head Circle", false, function(s) Config.ESP.Head = s end)
-addToggle(Visual, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end) -- НОВЫЙ ТОГГЛ
+addToggle(Visual, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end)
 addSlider(Visual, "Max Distance", 2000, 50, 500, function(v) Config.ESP.MaxDistance = v end)
 
 addToggle(Combat, "Aimbot Enabled", false, function(s)
@@ -1125,8 +1121,41 @@ RunService.RenderStepped:Connect(function()
     if CompletelyClosed then return end
     updateESP()
     doAimbot()
+    
     if FOVCircle and FOVCircle.Visible then
         FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        
+        -- Логика цвета FOV
+        if Config.ESP.VisibleCheck then
+            local hasVisibleTarget = false
+            local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character then
+                    local part = resolveTargetPart(p.Character, Config.Aimbot.TargetPart)
+                    if part then
+                        local sp, onScreen = Camera:WorldToViewportPoint(part.Position)
+                        if onScreen then
+                            local dist = (Vector2.new(sp.X, sp.Y) - screenCenter).Magnitude
+                            if dist <= Config.Aimbot.FOV then
+                                if isVisible(p.Character) then
+                                    hasVisibleTarget = true
+                                    break 
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            
+            if hasVisibleTarget then
+                FOVCircle.Color = Color3.fromRGB(0, 255, 0)
+            else
+                FOVCircle.Color = Color3.fromRGB(255, 0, 0)
+            end
+        else
+            FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+        end
     end
 end)
 
