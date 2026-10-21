@@ -34,7 +34,7 @@ local Config = {
     },
     Aimbot = {
         Enabled = false, Smoothness = 8, FOV = 60,
-        AimVisibleCheck = false,
+        AimVisibleCheck = false, -- Выключено по умолчанию
         TargetPart = "Torso",
         ReactionDelay = 0.15, AimJitter = 0.008,
         MaxAimDistance = 1000,
@@ -337,6 +337,7 @@ local function updateESP()
     end
 end
 
+-- Ищем цель ДЛЯ АИМА (с проверкой на Visible Check)
 local function getClosestTargetForAim()
     local closest, sDist = nil, math.huge
     local cn = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -356,6 +357,7 @@ local function getClosestTargetForAim()
         local part = resolveTargetPart(c, Config.Aimbot.TargetPart)
         if not part then continue end
         
+        -- ПРОВЕРКА ВИДИМОСТИ ДЛЯ АИМА
         if Config.Aimbot.AimVisibleCheck and not isVisible(c) then continue end
         
         local sp, on = Camera:WorldToViewportPoint(part.Position)
@@ -371,6 +373,7 @@ local function getClosestTargetForAim()
     return closest
 end
 
+-- Ищем цель ДЛЯ ЛИНИИ (всегда без проверки на стены, чтобы линия была видна)
 local function getClosestTargetForLine()
     local closest, sDist = nil, math.huge
     local cn = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -407,6 +410,7 @@ local function doAimbot()
     if not Config.Aimbot.Enabled then return end
     if aiming and os.clock() - aimStartTime < Config.Aimbot.ReactionDelay then return end
     
+    -- Наводимся ТОЛЬКО если есть видимая цель (или если Visible Check выключен)
     local t = getClosestTargetForAim()
     if not t then return end
     
@@ -1180,41 +1184,28 @@ RunService.RenderStepped:Connect(function()
     updateESP()
     doAimbot()
     
-    -- ЛИНИЯ АИМБОТА
+    -- ЛОГИКА ЛИНИИ: Ищем цель ВСЕГДА, даже если аим не видит (чтобы показать линию)
     if Config.Aimbot.Enabled and Config.Aimbot.Line then
-        local lineTarget = getClosestTargetForLine()
+        local lineTarget = getClosestTargetForLine() -- Ищем без проверки на стены
         if lineTarget then
             local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
             local targetPos, onScreen = Camera:WorldToViewportPoint(lineTarget.Position)
-            
             if onScreen then
-                local drawLine = false
                 local lineColor = Color3.fromRGB(255, 255, 255)
-                
                 if Config.ESP.VisibleCheck then
                     local char = lineTarget.Parent
                     if char and char:FindFirstChildOfClass("Humanoid") then
-                        if isVisible(char) then
-                            drawLine = true
-                            lineColor = Color3.fromRGB(0, 255, 0) -- Зеленый (виден)
-                        else
-                            drawLine = false -- НЕ РИСУЕМ, если за стеной
-                        end
+                        lineColor = isVisible(char) and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
                     end
-                else
-                    drawLine = true -- Рисуем всегда, если Visible Check выключен
-                    lineColor = Color3.fromRGB(255, 255, 255) -- Белый
                 end
                 
-                if drawLine then
-                    local l = Drawing.new("Line")
-                    l.Thickness = 1
-                    l.Color = lineColor
-                    l.From = screenCenter
-                    l.To = Vector2.new(targetPos.X, targetPos.Y)
-                    l.Visible = true
-                    task.delay(0.05, function() l:Remove() end)
-                end
+                local drawLine = Drawing.new("Line")
+                drawLine.Thickness = 1
+                drawLine.Color = lineColor
+                drawLine.From = screenCenter
+                drawLine.To = Vector2.new(targetPos.X, targetPos.Y)
+                drawLine.Visible = true
+                task.delay(0.05, function() drawLine:Remove() end)
             end
         end
     end
