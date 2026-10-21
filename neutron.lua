@@ -30,7 +30,7 @@ local Config = {
     ESP = {
         Enabled = false, Box = true, Name = false, Distance = false,
         Health = false, Tracer = false, Skeleton = false, Head = false,
-        MaxDistance = 1000, VisibleCheck = false,
+        MaxDistance = 1000, VisibleCheck = false
     },
     Aimbot = {
         Enabled = false, Smoothness = 8, FOV = 60,
