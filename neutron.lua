@@ -109,6 +109,7 @@ local function createESP(player)
     
     d.HealthBar = makeLine()
     d.HealthBar.Thickness = math.max(2, 3*SCALE)
+    d.HealthBar.Color = Color3.fromRGB(255,255,255) -- БЕЛЫЙ ЦВЕТ ХП
     
     d.Tracer = makeLine()
     d.Tracer.Color = Color3.fromRGB(255,255,255) 
@@ -274,12 +275,6 @@ local function updateESP()
                 o.HealthBG.Visible = true
                 o.HealthBar.From = Vector2.new(t.X - off, b.Y - bh * pc)
                 o.HealthBar.To = Vector2.new(t.X - off, b.Y)
-                
-                -- ПЛАВНЫЙ ГРАДИЕНТ ЦВЕТА (HSV)
-                -- 120 градусов = Зеленый, 0 градусов = Красный. 
-                -- Чем меньше HP, тем ближе к красному.
-                local hue = pc * 0.33 
-                o.HealthBar.Color = Color3.fromHSV(hue, 1, 1)
                 o.HealthBar.Visible = true
             else
                 o.HealthBar.Visible = false
@@ -841,17 +836,19 @@ local function addDropdown(parent, text, options, callback)
     end
 end
 
+-- ESP НАСТРОЙКИ
 addToggle(Visual.Page, "ESP Enabled", false, function(s) Config.ESP.Enabled = s end)
+addToggle(Visual.Page, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end)
 addToggle(Visual.Page, "Box", true, function(s) Config.ESP.Box = s end)
 addToggle(Visual.Page, "Name", false, function(s) Config.ESP.Name = s end)
 addToggle(Visual.Page, "Health Bar", false, function(s) Config.ESP.Health = s end)
 addToggle(Visual.Page, "Tracer", false, function(s) Config.ESP.Tracer = s end)
 addToggle(Visual.Page, "Skeleton", false, function(s) Config.ESP.Skeleton = s end)
 addToggle(Visual.Page, "Head Circle", false, function(s) Config.ESP.Head = s end)
-addToggle(Visual.Page, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end)
 addToggle(Visual.Page, "Show Distance", false, function(s) Config.ESP.Distance = s end)
 addSlider(Visual.Page, "ESP Distance", 2000, 0, 1000, function(v) Config.ESP.MaxDistance = v end)
 
+-- AIMBOT НАСТРОЙКИ
 addToggle(Combat.Page, "Aimbot Enabled", false, function(s)
     Config.Aimbot.Enabled = s
     if FOVCircle then FOVCircle.Visible = s end
