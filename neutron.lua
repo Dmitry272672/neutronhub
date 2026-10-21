@@ -109,7 +109,6 @@ local function createESP(player)
     
     d.HealthBar = makeLine()
     d.HealthBar.Thickness = math.max(2, 3*SCALE)
-    d.HealthBar.Color = Color3.fromRGB(255,255,255) -- БЕЛЫЙ ЦВЕТ ХП
     
     d.Tracer = makeLine()
     d.Tracer.Color = Color3.fromRGB(255,255,255) 
@@ -275,6 +274,17 @@ local function updateESP()
                 o.HealthBG.Visible = true
                 o.HealthBar.From = Vector2.new(t.X - off, b.Y - bh * pc)
                 o.HealthBar.To = Vector2.new(t.X - off, b.Y)
+                
+                -- ЦВЕТ ХП БАРА (от зеленого к красному, независимо от Visible Check)
+                if Config.ESP.VisibleCheck then
+                    -- Если Visible Check включен, цвет зависит от HP
+                    local hue = pc * 0.33 
+                    o.HealthBar.Color = Color3.fromHSV(hue, 1, 1)
+                else
+                    -- Если Visible Check выключен, полоска БЕЛАЯ
+                    o.HealthBar.Color = Color3.fromRGB(255, 255, 255)
+                end
+                
                 o.HealthBar.Visible = true
             else
                 o.HealthBar.Visible = false
@@ -836,7 +846,6 @@ local function addDropdown(parent, text, options, callback)
     end
 end
 
--- ESP НАСТРОЙКИ
 addToggle(Visual.Page, "ESP Enabled", false, function(s) Config.ESP.Enabled = s end)
 addToggle(Visual.Page, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end)
 addToggle(Visual.Page, "Box", true, function(s) Config.ESP.Box = s end)
@@ -848,7 +857,6 @@ addToggle(Visual.Page, "Head Circle", false, function(s) Config.ESP.Head = s end
 addToggle(Visual.Page, "Show Distance", false, function(s) Config.ESP.Distance = s end)
 addSlider(Visual.Page, "ESP Distance", 2000, 0, 1000, function(v) Config.ESP.MaxDistance = v end)
 
--- AIMBOT НАСТРОЙКИ
 addToggle(Combat.Page, "Aimbot Enabled", false, function(s)
     Config.Aimbot.Enabled = s
     if FOVCircle then FOVCircle.Visible = s end
