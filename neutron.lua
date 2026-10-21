@@ -109,7 +109,6 @@ local function createESP(player)
     
     d.HealthBar = makeLine()
     d.HealthBar.Thickness = math.max(2, 3*SCALE)
-    d.HealthBar.Color = Color3.fromRGB(255,255,255) 
     
     d.Tracer = makeLine()
     d.Tracer.Color = Color3.fromRGB(255,255,255) 
@@ -275,6 +274,12 @@ local function updateESP()
                 o.HealthBG.Visible = true
                 o.HealthBar.From = Vector2.new(t.X - off, b.Y - bh * pc)
                 o.HealthBar.To = Vector2.new(t.X - off, b.Y)
+                
+                -- ПЛАВНЫЙ ГРАДИЕНТ ЦВЕТА (HSV)
+                -- 120 градусов = Зеленый, 0 градусов = Красный. 
+                -- Чем меньше HP, тем ближе к красному.
+                local hue = pc * 0.33 
+                o.HealthBar.Color = Color3.fromHSV(hue, 1, 1)
                 o.HealthBar.Visible = true
             else
                 o.HealthBar.Visible = false
