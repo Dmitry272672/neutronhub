@@ -34,7 +34,8 @@ local Config = {
     },
     Aimbot = {
         Enabled = false, Smoothness = 8, FOV = 60,
-        VisibleOnly = true, TargetPart = "Torso",
+        VisibleOnly = false, -- ВАЖНО: Выключаем стандартную проверку видимости для линии
+        TargetPart = "Torso",
         ReactionDelay = 0.15, AimJitter = 0.008,
         MaxAimDistance = 1000,
         Line = false,
@@ -109,6 +110,7 @@ local function createESP(player)
     
     d.HealthBar = makeLine()
     d.HealthBar.Thickness = math.max(2, 3*SCALE)
+    d.HealthBar.Color = Color3.fromRGB(255,255,255)
     
     d.Tracer = makeLine()
     d.Tracer.Color = Color3.fromRGB(255,255,255) 
@@ -275,13 +277,10 @@ local function updateESP()
                 o.HealthBar.From = Vector2.new(t.X - off, b.Y - bh * pc)
                 o.HealthBar.To = Vector2.new(t.X - off, b.Y)
                 
-                -- ЦВЕТ ХП БАРА (от зеленого к красному, независимо от Visible Check)
                 if Config.ESP.VisibleCheck then
-                    -- Если Visible Check включен, цвет зависит от HP
                     local hue = pc * 0.33 
                     o.HealthBar.Color = Color3.fromHSV(hue, 1, 1)
                 else
-                    -- Если Visible Check выключен, полоска БЕЛАЯ
                     o.HealthBar.Color = Color3.fromRGB(255, 255, 255)
                 end
                 
@@ -356,7 +355,9 @@ local function getClosestTarget()
 
         local part = resolveTargetPart(c, Config.Aimbot.TargetPart)
         if not part then continue end
-        if Config.Aimbot.VisibleOnly and not isVisible(c) then continue end
+        
+        -- МЫ УБРАЛИ ПРОВЕРКУ ВИДИМОСТИ ДЛЯ АИМБОТА (VisibleOnly теперь false)
+        -- if Config.Aimbot.VisibleOnly and not isVisible(c) then continue end
         
         local sp, on = Camera:WorldToViewportPoint(part.Position)
         if not on then continue end
@@ -1172,17 +1173,20 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- ЛИНИЯ АИМБОТА (Рисуется всегда при вкл Draw Line, цвет меняется только при Visible Check)
     if Config.Aimbot.Enabled and Config.Aimbot.Line and currentAimTarget then
         local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         local targetPos, onScreen = Camera:WorldToViewportPoint(currentAimTarget.Position)
         if onScreen then
-            local lineColor = Color3.fromRGB(255, 255, 255)
+            local lineColor = Color3.fromRGB(255, 255, 255) -- Белая по умолчанию
+            
             if Config.ESP.VisibleCheck then
                 local char = currentAimTarget.Parent
                 if char and char:FindFirstChildOfClass("Humanoid") then
                     lineColor = isVisible(char) and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
                 end
             end
+            
             local drawLine = Drawing.new("Line")
             drawLine.Thickness = 1
             drawLine.Color = lineColor
