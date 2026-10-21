@@ -28,13 +28,13 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function() SCALE = getSc
 
 local Config = {
     ESP = {
-        Enabled = false, Box = true, Name = false, Distance = false,
+        Enabled = false, Box = false, Name = false, Distance = false,
         Health = false, Tracer = false, Skeleton = false, Head = false,
         MaxDistance = 1000, VisibleCheck = false
     },
     Aimbot = {
         Enabled = false, Smoothness = 8, FOV = 60,
-        AimVisibleCheck = true, -- ПЕРЕИМЕНОВАНО И РАБОТАЕТ
+        AimVisibleCheck = false, -- ВСЁ ВЫКЛЮЧЕНО ПО УМОЛЧАНИЮ
         TargetPart = "Torso",
         ReactionDelay = 0.15, AimJitter = 0.008,
         MaxAimDistance = 1000,
@@ -356,7 +356,7 @@ local function getClosestTarget()
         local part = resolveTargetPart(c, Config.Aimbot.TargetPart)
         if not part then continue end
         
-        -- ФИКС: Проверка на видимость для аимбота работает!
+        -- ФИКС VISIBLE CHECK В АИМБОТЕ
         if Config.Aimbot.AimVisibleCheck and not isVisible(c) then continue end
         
         local sp, on = Camera:WorldToViewportPoint(part.Position)
@@ -849,7 +849,7 @@ end
 
 addToggle(Visual.Page, "ESP Enabled", false, function(s) Config.ESP.Enabled = s end)
 addToggle(Visual.Page, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end)
-addToggle(Visual.Page, "Box", true, function(s) Config.ESP.Box = s end)
+addToggle(Visual.Page, "Box", false, function(s) Config.ESP.Box = s end)
 addToggle(Visual.Page, "Name", false, function(s) Config.ESP.Name = s end)
 addToggle(Visual.Page, "Health Bar", false, function(s) Config.ESP.Health = s end)
 addToggle(Visual.Page, "Tracer", false, function(s) Config.ESP.Tracer = s end)
@@ -862,7 +862,7 @@ addToggle(Combat.Page, "Aimbot Enabled", false, function(s)
     Config.Aimbot.Enabled = s
     if FOVCircle then FOVCircle.Visible = s end
 end)
-addToggle(Combat.Page, "Visible Check", true, function(s) Config.Aimbot.AimVisibleCheck = s end) -- ПЕРЕИМЕНОВАНО И РАБОТАЕТ
+addToggle(Combat.Page, "Visible Check", false, function(s) Config.Aimbot.AimVisibleCheck = s end)
 addToggle(Combat.Page, "Draw Line", false, function(s) Config.Aimbot.Line = s end)
 addSlider(Combat.Page, "Smoothness", 10, 1, 8, function(v) Config.Aimbot.Smoothness = v end)
 addSlider(Combat.Page, "FOV", 200, 30, 60, function(v)
@@ -1173,7 +1173,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ЛИНИЯ АИМБОТА (Рисуется всегда при вкл Draw Line, цвет меняется только при Visible Check)
+    -- ЛИНИЯ АИМБОТА (Рисуется всегда, если включено, цвет меняется только при Visible Check)
     if Config.Aimbot.Enabled and Config.Aimbot.Line and currentAimTarget then
         local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         local targetPos, onScreen = Camera:WorldToViewportPoint(currentAimTarget.Position)
