@@ -34,7 +34,7 @@ local Config = {
     },
     Aimbot = {
         Enabled = false, Smoothness = 8, FOV = 60,
-        VisibleOnly = false, -- ВАЖНО: Выключаем стандартную проверку видимости для линии
+        AimVisibleCheck = true, -- ПЕРЕИМЕНОВАНО И РАБОТАЕТ
         TargetPart = "Torso",
         ReactionDelay = 0.15, AimJitter = 0.008,
         MaxAimDistance = 1000,
@@ -356,8 +356,8 @@ local function getClosestTarget()
         local part = resolveTargetPart(c, Config.Aimbot.TargetPart)
         if not part then continue end
         
-        -- МЫ УБРАЛИ ПРОВЕРКУ ВИДИМОСТИ ДЛЯ АИМБОТА (VisibleOnly теперь false)
-        -- if Config.Aimbot.VisibleOnly and not isVisible(c) then continue end
+        -- ФИКС: Проверка на видимость для аимбота работает!
+        if Config.Aimbot.AimVisibleCheck and not isVisible(c) then continue end
         
         local sp, on = Camera:WorldToViewportPoint(part.Position)
         if not on then continue end
@@ -862,7 +862,7 @@ addToggle(Combat.Page, "Aimbot Enabled", false, function(s)
     Config.Aimbot.Enabled = s
     if FOVCircle then FOVCircle.Visible = s end
 end)
-addToggle(Combat.Page, "Visible Only", true, function(s) Config.Aimbot.VisibleOnly = s end)
+addToggle(Combat.Page, "Visible Check", true, function(s) Config.Aimbot.AimVisibleCheck = s end) -- ПЕРЕИМЕНОВАНО И РАБОТАЕТ
 addToggle(Combat.Page, "Draw Line", false, function(s) Config.Aimbot.Line = s end)
 addSlider(Combat.Page, "Smoothness", 10, 1, 8, function(v) Config.Aimbot.Smoothness = v end)
 addSlider(Combat.Page, "FOV", 200, 30, 60, function(v)
@@ -1178,7 +1178,7 @@ RunService.RenderStepped:Connect(function()
         local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         local targetPos, onScreen = Camera:WorldToViewportPoint(currentAimTarget.Position)
         if onScreen then
-            local lineColor = Color3.fromRGB(255, 255, 255) -- Белая по умолчанию
+            local lineColor = Color3.fromRGB(255, 255, 255)
             
             if Config.ESP.VisibleCheck then
                 local char = currentAimTarget.Parent
