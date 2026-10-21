@@ -34,7 +34,7 @@ local Config = {
     },
     Aimbot = {
         Enabled = false, Smoothness = 8, FOV = 60,
-        AimVisibleCheck = false, -- ВСЁ ВЫКЛЮЧЕНО ПО УМОЛЧАНИЮ
+        AimVisibleCheck = false, -- Выключено по умолчанию
         TargetPart = "Torso",
         ReactionDelay = 0.15, AimJitter = 0.008,
         MaxAimDistance = 1000,
@@ -337,7 +337,8 @@ local function updateESP()
     end
 end
 
-local function getClosestTarget()
+-- Ищем цель ДЛЯ АИМА (с проверкой на Visible Check)
+local function getClosestTargetForAim()
     local closest, sDist = nil, math.huge
     local cn = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     for _, p in pairs(Players:GetPlayers()) do
@@ -356,7 +357,7 @@ local function getClosestTarget()
         local part = resolveTargetPart(c, Config.Aimbot.TargetPart)
         if not part then continue end
         
-        -- ФИКС VISIBLE CHECK В АИМБОТЕ
+        -- ПРОВЕРКА ВИДИМОСТИ ДЛЯ АИМА
         if Config.Aimbot.AimVisibleCheck and not isVisible(c) then continue end
         
         local sp, on = Camera:WorldToViewportPoint(part.Position)
@@ -372,12 +373,47 @@ local function getClosestTarget()
     return closest
 end
 
+-- Ищем цель ДЛЯ ЛИНИИ (всегда без проверки на стены, чтобы линия была видна)
+local function getClosestTargetForLine()
+    local closest, sDist = nil, math.huge
+    local cn = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    for _, p in pairs(Players:GetPlayers()) do
+        if p == LocalPlayer then continue end
+        local c = p.Character
+        if not c then continue end
+        local hum = c:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
+        
+        local root = c:FindFirstChild("HumanoidRootPart")
+        if root then
+            local dist = (Camera.CFrame.Position - root.Position).Magnitude
+            if dist > Config.Aimbot.MaxAimDistance then continue end
+        end
+
+        local part = resolveTargetPart(c, Config.Aimbot.TargetPart)
+        if not part then continue end
+        
+        local sp, on = Camera:WorldToViewportPoint(part.Position)
+        if not on then continue end
+        
+        local d = (Vector2.new(sp.X, sp.Y) - cn).Magnitude
+        
+        if d < sDist and d <= Config.Aimbot.FOV then 
+            sDist = d
+            closest = part 
+        end
+    end
+    return closest
+end
+
 local function doAimbot()
-    if not Config.Aimbot.Enabled then currentAimTarget = nil; return end
+    if not Config.Aimbot.Enabled then return end
     if aiming and os.clock() - aimStartTime < Config.Aimbot.ReactionDelay then return end
-    local t = getClosestTarget()
-    currentAimTarget = t
+    
+    -- Наводимся ТОЛЬКО если есть видимая цель (или если Visible Check выключен)
+    local t = getClosestTargetForAim()
     if not t then return end
+    
     local la = math.clamp(0.825 - (Config.Aimbot.Smoothness * 0.075), 0.05, 1)
     local jit = Config.Aimbot.AimJitter
     local tp = t.Position + Vector3.new((math.random()-0.5)*jit, (math.random()-0.5)*jit, (math.random()-0.5)*jit)
@@ -1148,6 +1184,32 @@ RunService.RenderStepped:Connect(function()
     updateESP()
     doAimbot()
     
+    -- ЛОГИКА ЛИНИИ: Ищем цель ВСЕГДА, даже если аим не видит (чтобы показать линию)
+    if Config.Aimbot.Enabled and Config.Aimbot.Line then
+        local lineTarget = getClosestTargetForLine() -- Ищем без проверки на стены
+        if lineTarget then
+            local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            local targetPos, onScreen = Camera:WorldToViewportPoint(lineTarget.Position)
+            if onScreen then
+                local lineColor = Color3.fromRGB(255, 255, 255)
+                if Config.ESP.VisibleCheck then
+                    local char = lineTarget.Parent
+                    if char and char:FindFirstChildOfClass("Humanoid") then
+                        lineColor = isVisible(char) and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                    end
+                end
+                
+                local drawLine = Drawing.new("Line")
+                drawLine.Thickness = 1
+                drawLine.Color = lineColor
+                drawLine.From = screenCenter
+                drawLine.To = Vector2.new(targetPos.X, targetPos.Y)
+                drawLine.Visible = true
+                task.delay(0.05, function() drawLine:Remove() end)
+            end
+        end
+    end
+    
     if FOVCircle and FOVCircle.Visible then
         FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         if Config.ESP.VisibleCheck then
@@ -1170,30 +1232,6 @@ RunService.RenderStepped:Connect(function()
             FOVCircle.Color = hasVisibleTarget and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
         else
             FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-        end
-    end
-
-    -- ЛИНИЯ АИМБОТА (Рисуется всегда, если включено, цвет меняется только при Visible Check)
-    if Config.Aimbot.Enabled and Config.Aimbot.Line and currentAimTarget then
-        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        local targetPos, onScreen = Camera:WorldToViewportPoint(currentAimTarget.Position)
-        if onScreen then
-            local lineColor = Color3.fromRGB(255, 255, 255)
-            
-            if Config.ESP.VisibleCheck then
-                local char = currentAimTarget.Parent
-                if char and char:FindFirstChildOfClass("Humanoid") then
-                    lineColor = isVisible(char) and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-                end
-            end
-            
-            local drawLine = Drawing.new("Line")
-            drawLine.Thickness = 1
-            drawLine.Color = lineColor
-            drawLine.From = screenCenter
-            drawLine.To = Vector2.new(targetPos.X, targetPos.Y)
-            drawLine.Visible = true
-            task.delay(0.05, function() drawLine:Remove() end)
         end
     end
 end)
