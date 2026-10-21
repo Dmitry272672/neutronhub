@@ -8,7 +8,7 @@ local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 local IMAGE_URL = "rbxassetid://138823883244540"
-local TG_LINK = "t.me/Neutron016" -- ИСПРАВЛЕННАЯ ССЫЛКА
+local TG_LINK = "t.me/Neutron016"
 
 local SCALE = 1
 local screenResText = "0x0"
@@ -30,12 +30,15 @@ local Config = {
     ESP = {
         Enabled = false, Box = true, Name = false, Distance = false,
         Health = false, Tracer = false, Skeleton = false, Head = false,
-        MaxDistance = 500, VisibleCheck = false
+        MaxDistance = 1000, VisibleCheck = false,
+        ItemEnabled = false, ItemName = true, ItemDistance = false
     },
     Aimbot = {
         Enabled = false, Smoothness = 8, FOV = 60,
         VisibleOnly = true, TargetPart = "Torso",
         ReactionDelay = 0.15, AimJitter = 0.008,
+        MaxAimDistance = 1000,
+        Line = false,
     },
 }
 
@@ -45,6 +48,7 @@ local Open = true
 local CompletelyClosed = false
 local aimStartTime = 0
 local aiming = false
+local currentAimTarget = nil
 
 local function resolveTargetPart(char, targetName)
     if not char then return nil end
@@ -334,29 +338,39 @@ local function getClosestTarget()
         if not c then continue end
         local hum = c:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then continue end
+        
+        local root = c:FindFirstChild("HumanoidRootPart")
+        if root then
+            local dist = (Camera.CFrame.Position - root.Position).Magnitude
+            if dist > Config.Aimbot.MaxAimDistance then continue end
+        end
+
         local part = resolveTargetPart(c, Config.Aimbot.TargetPart)
         if not part then continue end
         if Config.Aimbot.VisibleOnly and not isVisible(c) then continue end
+        
         local sp, on = Camera:WorldToViewportPoint(part.Position)
         if not on then continue end
+        
         local d = (Vector2.new(sp.X, sp.Y) - cn).Magnitude
-        if d < sDist and d <= Config.Aimbot.FOV then sDist = d; closest = part end
+        
+        if d < sDist and d <= Config.Aimbot.FOV then 
+            sDist = d
+            closest = part 
+        end
     end
     return closest
 end
 
 local function doAimbot()
-    if not Config.Aimbot.Enabled then return end
+    if not Config.Aimbot.Enabled then currentAimTarget = nil; return end
     if aiming and os.clock() - aimStartTime < Config.Aimbot.ReactionDelay then return end
     local t = getClosestTarget()
+    currentAimTarget = t
     if not t then return end
     local la = math.clamp(0.825 - (Config.Aimbot.Smoothness * 0.075), 0.05, 1)
     local jit = Config.Aimbot.AimJitter
-    local tp = t.Position + Vector3.new(
-        (math.random()-0.5)*jit,
-        (math.random()-0.5)*jit,
-        (math.random()-0.5)*jit
-    )
+    local tp = t.Position + Vector3.new((math.random()-0.5)*jit, (math.random()-0.5)*jit, (math.random()-0.5)*jit)
     Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, tp), la)
 end
 
@@ -374,7 +388,7 @@ end
 createFOVCircle()
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Neutron I decay"
+ScreenGui.Name = "Neutron"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.DisplayOrder = 999
@@ -411,8 +425,8 @@ tbStroke.Transparency = 0.5
 tbStroke.Parent = ToggleBtn
 
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 260, 0, 330)
-Main.Position = UDim2.new(0.5, -130, 0.5, -165)
+Main.Size = UDim2.new(0, 260, 0, 360)
+Main.Position = UDim2.new(0.5, -130, 0.5, -180)
 Main.BackgroundColor3 = CLR_BG
 Main.BorderSizePixel = 0
 Main.Active = true
@@ -457,7 +471,7 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -160, 1, 0)
 Title.Position = UDim2.new(0, 42, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "NEUTRON I DECAY"
+Title.Text = "NEUTRON"
 Title.TextColor3 = CLR_ACCENT
 Title.TextSize = 15
 Title.Font = Enum.Font.GothamBold
@@ -647,7 +661,7 @@ local function addToggle(parent, text, default, callback)
     holder.Size = UDim2.new(1, 0, 0, 34)
     holder.BackgroundColor3 = CLR_ELEM
     holder.BorderSizePixel = 0
-    holder.Parent = parent.Page
+    holder.Parent = parent
     local hc = Instance.new("UICorner")
     hc.CornerRadius = UDim.new(0,6)
     hc.Parent = holder
@@ -710,7 +724,7 @@ local function addSlider(parent, text, max, min, default, callback)
     holder.Size = UDim2.new(1, 0, 0, 48)
     holder.BackgroundColor3 = CLR_ELEM
     holder.BorderSizePixel = 0
-    holder.Parent = parent.Page
+    holder.Parent = parent
     local hc = Instance.new("UICorner")
     hc.CornerRadius = UDim.new(0,6)
     hc.Parent = holder
@@ -779,7 +793,7 @@ local function addDropdown(parent, text, options, callback)
     holder.BackgroundColor3 = CLR_ELEM
     holder.BorderSizePixel = 0
     holder.ClipsDescendants = true
-    holder.Parent = parent.Page
+    holder.Parent = parent
     local hc = Instance.new("UICorner")
     hc.CornerRadius = UDim.new(0,6)
     hc.Parent = holder
@@ -823,28 +837,102 @@ local function addDropdown(parent, text, options, callback)
     end
 end
 
-addToggle(Visual, "ESP Enabled", false, function(s) Config.ESP.Enabled = s end)
-addToggle(Visual, "Box", true, function(s) Config.ESP.Box = s end)
-addToggle(Visual, "Name", false, function(s) Config.ESP.Name = s end)
-addToggle(Visual, "Distance", false, function(s) Config.ESP.Distance = s end)
-addToggle(Visual, "Health Bar", false, function(s) Config.ESP.Health = s end)
-addToggle(Visual, "Tracer", false, function(s) Config.ESP.Tracer = s end)
-addToggle(Visual, "Skeleton", false, function(s) Config.ESP.Skeleton = s end)
-addToggle(Visual, "Head Circle", false, function(s) Config.ESP.Head = s end)
-addToggle(Visual, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end)
-addSlider(Visual, "Max Distance", 2000, 50, 500, function(v) Config.ESP.MaxDistance = v end)
+local SubTabsFrame = Instance.new("Frame")
+SubTabsFrame.Size = UDim2.new(1, 0, 0, 30)
+SubTabsFrame.BackgroundTransparency = 1
+SubTabsFrame.Parent = Visual.Page
+SubTabsFrame.LayoutOrder = -1
 
-addToggle(Combat, "Aimbot Enabled", false, function(s)
+local SubPlayersBtn = Instance.new("TextButton")
+SubPlayersBtn.Size = UDim2.new(0.5, -2, 1, 0)
+SubPlayersBtn.Position = UDim2.new(0, 0, 0, 0)
+SubPlayersBtn.BackgroundColor3 = CLR_TOGGLE_ON
+SubPlayersBtn.BorderSizePixel = 0
+SubPlayersBtn.Text = "Players"
+SubPlayersBtn.TextColor3 = CLR_BG
+SubPlayersBtn.Font = Enum.Font.GothamBold
+SubPlayersBtn.TextSize = 12
+SubPlayersBtn.Parent = SubTabsFrame
+local spc = Instance.new("UICorner")
+spc.CornerRadius = UDim.new(0,6)
+spc.Parent = SubPlayersBtn
+
+local SubOtherBtn = Instance.new("TextButton")
+SubOtherBtn.Size = UDim2.new(0.5, -2, 1, 0)
+SubOtherBtn.Position = UDim2.new(0.5, 2, 0, 0)
+SubOtherBtn.BackgroundColor3 = CLR_ELEM
+SubOtherBtn.BorderSizePixel = 0
+SubOtherBtn.Text = "Other"
+SubOtherBtn.TextColor3 = CLR_TEXT_DARK
+SubOtherBtn.Font = Enum.Font.GothamBold
+SubOtherBtn.TextSize = 12
+SubOtherBtn.Parent = SubTabsFrame
+local soc = Instance.new("UICorner")
+soc.CornerRadius = UDim.new(0,6)
+soc.Parent = SubOtherBtn
+
+local PagePlayers = Instance.new("Frame")
+PagePlayers.Size = UDim2.new(1, 0, 1, -35)
+PagePlayers.Position = UDim2.new(0, 0, 0, 35)
+PagePlayers.BackgroundTransparency = 1
+PagePlayers.Parent = Visual.Page
+local pplLayout = Instance.new("UIListLayout")
+pplLayout.Padding = UDim.new(0, 5)
+pplLayout.SortOrder = Enum.SortOrder.LayoutOrder
+pplLayout.Parent = PagePlayers
+
+local PageOther = Instance.new("Frame")
+PageOther.Size = UDim2.new(1, 0, 1, -35)
+PageOther.Position = UDim2.new(0, 0, 0, 35)
+PageOther.BackgroundTransparency = 1
+PageOther.Visible = false
+PageOther.Parent = Visual.Page
+local othLayout = Instance.new("UIListLayout")
+othLayout.Padding = UDim.new(0, 5)
+othLayout.SortOrder = Enum.SortOrder.LayoutOrder
+othLayout.Parent = PageOther
+
+SubPlayersBtn.MouseButton1Click:Connect(function()
+    PagePlayers.Visible = true
+    PageOther.Visible = false
+    TweenService:Create(SubPlayersBtn, TweenInfo.new(0.15), {BackgroundColor3 = CLR_TOGGLE_ON, TextColor3 = CLR_BG}):Play()
+    TweenService:Create(SubOtherBtn, TweenInfo.new(0.15), {BackgroundColor3 = CLR_ELEM, TextColor3 = CLR_TEXT_DARK}):Play()
+end)
+
+SubOtherBtn.MouseButton1Click:Connect(function()
+    PagePlayers.Visible = false
+    PageOther.Visible = true
+    TweenService:Create(SubOtherBtn, TweenInfo.new(0.15), {BackgroundColor3 = CLR_TOGGLE_ON, TextColor3 = CLR_BG}):Play()
+    TweenService:Create(SubPlayersBtn, TweenInfo.new(0.15), {BackgroundColor3 = CLR_ELEM, TextColor3 = CLR_TEXT_DARK}):Play()
+end)
+
+addToggle(PagePlayers, "ESP Enabled", false, function(s) Config.ESP.Enabled = s end)
+addToggle(PagePlayers, "Box", true, function(s) Config.ESP.Box = s end)
+addToggle(PagePlayers, "Name", false, function(s) Config.ESP.Name = s end)
+addToggle(PagePlayers, "Health Bar", false, function(s) Config.ESP.Health = s end)
+addToggle(PagePlayers, "Tracer", false, function(s) Config.ESP.Tracer = s end)
+addToggle(PagePlayers, "Skeleton", false, function(s) Config.ESP.Skeleton = s end)
+addToggle(PagePlayers, "Head Circle", false, function(s) Config.ESP.Head = s end)
+addToggle(PagePlayers, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end)
+addSlider(PagePlayers, "ESP Distance", 2000, 0, 1000, function(v) Config.ESP.MaxDistance = v end)
+
+addToggle(PageOther, "Item ESP", false, function(s) Config.ESP.ItemEnabled = s end)
+addToggle(PageOther, "Item Name", true, function(s) Config.ESP.ItemName = s end)
+addToggle(PageOther, "Item Distance", false, function(s) Config.ESP.ItemDistance = s end)
+
+addToggle(Combat.Page, "Aimbot Enabled", false, function(s)
     Config.Aimbot.Enabled = s
     if FOVCircle then FOVCircle.Visible = s end
 end)
-addToggle(Combat, "Visible Only", true, function(s) Config.Aimbot.VisibleOnly = s end)
-addSlider(Combat, "Smoothness", 10, 1, 8, function(v) Config.Aimbot.Smoothness = v end)
-addSlider(Combat, "FOV", 200, 30, 60, function(v)
+addToggle(Combat.Page, "Visible Only", true, function(s) Config.Aimbot.VisibleOnly = s end)
+addToggle(Combat.Page, "Draw Line", false, function(s) Config.Aimbot.Line = s end)
+addSlider(Combat.Page, "Smoothness", 10, 1, 8, function(v) Config.Aimbot.Smoothness = v end)
+addSlider(Combat.Page, "FOV", 200, 30, 60, function(v)
     Config.Aimbot.FOV = v
     if FOVCircle then FOVCircle.Radius = v end
 end)
-addDropdown(Combat, "Target", {"Torso", "Head"}, function(v) Config.Aimbot.TargetPart = v end)
+addSlider(Combat.Page, "Aim Distance", 2000, 0, 1000, function(v) Config.Aimbot.MaxAimDistance = v end)
+addDropdown(Combat.Page, "Target", {"Torso", "Head"}, function(v) Config.Aimbot.TargetPart = v end)
 
 local TgHolder = Instance.new("Frame")
 TgHolder.Size = UDim2.new(1, 0, 0, 96)
@@ -1073,7 +1161,7 @@ local function setOpen(state)
         Main.Visible = true
         Main.Size = UDim2.new(0, 0, 0, 0)
         TweenService:Create(Main, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(0, 260, 0, 330)
+            Size = UDim2.new(0, 260, 0, 360)
         }):Play()
     else
         local t = TweenService:Create(Main, TweenInfo.new(0.15), { Size = UDim2.new(0, 0, 0, 0) })
@@ -1124,12 +1212,9 @@ RunService.RenderStepped:Connect(function()
     
     if FOVCircle and FOVCircle.Visible then
         FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        
-        -- Логика цвета FOV
         if Config.ESP.VisibleCheck then
             local hasVisibleTarget = false
             local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-            
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character then
                     local part = resolveTargetPart(p.Character, Config.Aimbot.TargetPart)
@@ -1138,25 +1223,38 @@ RunService.RenderStepped:Connect(function()
                         if onScreen then
                             local dist = (Vector2.new(sp.X, sp.Y) - screenCenter).Magnitude
                             if dist <= Config.Aimbot.FOV then
-                                if isVisible(p.Character) then
-                                    hasVisibleTarget = true
-                                    break 
-                                end
+                                if isVisible(p.Character) then hasVisibleTarget = true; break end
                             end
                         end
                     end
                 end
             end
-            
-            if hasVisibleTarget then
-                FOVCircle.Color = Color3.fromRGB(0, 255, 0)
-            else
-                FOVCircle.Color = Color3.fromRGB(255, 0, 0)
-            end
+            FOVCircle.Color = hasVisibleTarget and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
         else
             FOVCircle.Color = Color3.fromRGB(255, 255, 255)
         end
     end
+
+    if Config.Aimbot.Enabled and Config.Aimbot.Line and currentAimTarget then
+        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        local targetPos, onScreen = Camera:WorldToViewportPoint(currentAimTarget.Position)
+        if onScreen then
+            local lineColor = Color3.fromRGB(255, 255, 255)
+            if Config.ESP.VisibleCheck then
+                local char = currentAimTarget.Parent
+                if char and char:FindFirstChildOfClass("Humanoid") then
+                    lineColor = isVisible(char) and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                end
+            end
+            local drawLine = Drawing.new("Line")
+            drawLine.Thickness = 1
+            drawLine.Color = lineColor
+            drawLine.From = screenCenter
+            drawLine.To = Vector2.new(targetPos.X, targetPos.Y)
+            drawLine.Visible = true
+            task.delay(0.05, function() drawLine:Remove() end)
+        end
+    end
 end)
 
-print("NEUTRON I DECAY loaded!")
+print("NEUTRON loaded!")
