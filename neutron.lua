@@ -31,7 +31,6 @@ local Config = {
         Enabled = false, Box = true, Name = false, Distance = false,
         Health = false, Tracer = false, Skeleton = false, Head = false,
         MaxDistance = 1000, VisibleCheck = false,
-        ItemEnabled = false, ItemName = true, ItemDistance = false
     },
     Aimbot = {
         Enabled = false, Smoothness = 8, FOV = 60,
@@ -837,88 +836,16 @@ local function addDropdown(parent, text, options, callback)
     end
 end
 
-local SubTabsFrame = Instance.new("Frame")
-SubTabsFrame.Size = UDim2.new(1, 0, 0, 30)
-SubTabsFrame.BackgroundTransparency = 1
-SubTabsFrame.Parent = Visual.Page
-SubTabsFrame.LayoutOrder = -1
-
-local SubPlayersBtn = Instance.new("TextButton")
-SubPlayersBtn.Size = UDim2.new(0.5, -2, 1, 0)
-SubPlayersBtn.Position = UDim2.new(0, 0, 0, 0)
-SubPlayersBtn.BackgroundColor3 = CLR_TOGGLE_ON
-SubPlayersBtn.BorderSizePixel = 0
-SubPlayersBtn.Text = "Players"
-SubPlayersBtn.TextColor3 = CLR_BG
-SubPlayersBtn.Font = Enum.Font.GothamBold
-SubPlayersBtn.TextSize = 12
-SubPlayersBtn.Parent = SubTabsFrame
-local spc = Instance.new("UICorner")
-spc.CornerRadius = UDim.new(0,6)
-spc.Parent = SubPlayersBtn
-
-local SubOtherBtn = Instance.new("TextButton")
-SubOtherBtn.Size = UDim2.new(0.5, -2, 1, 0)
-SubOtherBtn.Position = UDim2.new(0.5, 2, 0, 0)
-SubOtherBtn.BackgroundColor3 = CLR_ELEM
-SubOtherBtn.BorderSizePixel = 0
-SubOtherBtn.Text = "Other"
-SubOtherBtn.TextColor3 = CLR_TEXT_DARK
-SubOtherBtn.Font = Enum.Font.GothamBold
-SubOtherBtn.TextSize = 12
-SubOtherBtn.Parent = SubTabsFrame
-local soc = Instance.new("UICorner")
-soc.CornerRadius = UDim.new(0,6)
-soc.Parent = SubOtherBtn
-
-local PagePlayers = Instance.new("Frame")
-PagePlayers.Size = UDim2.new(1, 0, 1, -35)
-PagePlayers.Position = UDim2.new(0, 0, 0, 35)
-PagePlayers.BackgroundTransparency = 1
-PagePlayers.Parent = Visual.Page
-local pplLayout = Instance.new("UIListLayout")
-pplLayout.Padding = UDim.new(0, 5)
-pplLayout.SortOrder = Enum.SortOrder.LayoutOrder
-pplLayout.Parent = PagePlayers
-
-local PageOther = Instance.new("Frame")
-PageOther.Size = UDim2.new(1, 0, 1, -35)
-PageOther.Position = UDim2.new(0, 0, 0, 35)
-PageOther.BackgroundTransparency = 1
-PageOther.Visible = false
-PageOther.Parent = Visual.Page
-local othLayout = Instance.new("UIListLayout")
-othLayout.Padding = UDim.new(0, 5)
-othLayout.SortOrder = Enum.SortOrder.LayoutOrder
-othLayout.Parent = PageOther
-
-SubPlayersBtn.MouseButton1Click:Connect(function()
-    PagePlayers.Visible = true
-    PageOther.Visible = false
-    TweenService:Create(SubPlayersBtn, TweenInfo.new(0.15), {BackgroundColor3 = CLR_TOGGLE_ON, TextColor3 = CLR_BG}):Play()
-    TweenService:Create(SubOtherBtn, TweenInfo.new(0.15), {BackgroundColor3 = CLR_ELEM, TextColor3 = CLR_TEXT_DARK}):Play()
-end)
-
-SubOtherBtn.MouseButton1Click:Connect(function()
-    PagePlayers.Visible = false
-    PageOther.Visible = true
-    TweenService:Create(SubOtherBtn, TweenInfo.new(0.15), {BackgroundColor3 = CLR_TOGGLE_ON, TextColor3 = CLR_BG}):Play()
-    TweenService:Create(SubPlayersBtn, TweenInfo.new(0.15), {BackgroundColor3 = CLR_ELEM, TextColor3 = CLR_TEXT_DARK}):Play()
-end)
-
-addToggle(PagePlayers, "ESP Enabled", false, function(s) Config.ESP.Enabled = s end)
-addToggle(PagePlayers, "Box", true, function(s) Config.ESP.Box = s end)
-addToggle(PagePlayers, "Name", false, function(s) Config.ESP.Name = s end)
-addToggle(PagePlayers, "Health Bar", false, function(s) Config.ESP.Health = s end)
-addToggle(PagePlayers, "Tracer", false, function(s) Config.ESP.Tracer = s end)
-addToggle(PagePlayers, "Skeleton", false, function(s) Config.ESP.Skeleton = s end)
-addToggle(PagePlayers, "Head Circle", false, function(s) Config.ESP.Head = s end)
-addToggle(PagePlayers, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end)
-addSlider(PagePlayers, "ESP Distance", 2000, 0, 1000, function(v) Config.ESP.MaxDistance = v end)
-
-addToggle(PageOther, "Item ESP", false, function(s) Config.ESP.ItemEnabled = s end)
-addToggle(PageOther, "Item Name", true, function(s) Config.ESP.ItemName = s end)
-addToggle(PageOther, "Item Distance", false, function(s) Config.ESP.ItemDistance = s end)
+addToggle(Visual.Page, "ESP Enabled", false, function(s) Config.ESP.Enabled = s end)
+addToggle(Visual.Page, "Box", true, function(s) Config.ESP.Box = s end)
+addToggle(Visual.Page, "Name", false, function(s) Config.ESP.Name = s end)
+addToggle(Visual.Page, "Health Bar", false, function(s) Config.ESP.Health = s end)
+addToggle(Visual.Page, "Tracer", false, function(s) Config.ESP.Tracer = s end)
+addToggle(Visual.Page, "Skeleton", false, function(s) Config.ESP.Skeleton = s end)
+addToggle(Visual.Page, "Head Circle", false, function(s) Config.ESP.Head = s end)
+addToggle(Visual.Page, "Visible Check", false, function(s) Config.ESP.VisibleCheck = s end)
+addToggle(Visual.Page, "Show Distance", false, function(s) Config.ESP.Distance = s end)
+addSlider(Visual.Page, "ESP Distance", 2000, 0, 1000, function(v) Config.ESP.MaxDistance = v end)
 
 addToggle(Combat.Page, "Aimbot Enabled", false, function(s)
     Config.Aimbot.Enabled = s
