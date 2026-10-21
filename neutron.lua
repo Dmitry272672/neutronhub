@@ -1180,7 +1180,7 @@ RunService.RenderStepped:Connect(function()
     updateESP()
     doAimbot()
     
-    -- ЛИНИЯ АИМБОТА (исправлено)
+    -- ЛИНИЯ АИМБОТА (ВСЕГДА РИСУЕТСЯ, если включен Draw Line)
     if Config.Aimbot.Enabled and Config.Aimbot.Line then
         local lineTarget = getClosestTargetForLine()
         if lineTarget then
@@ -1188,33 +1188,27 @@ RunService.RenderStepped:Connect(function()
             local targetPos, onScreen = Camera:WorldToViewportPoint(lineTarget.Position)
             
             if onScreen then
-                local drawLine = false
-                local lineColor = Color3.fromRGB(255, 255, 255)
+                local lineColor = Color3.fromRGB(255, 255, 255) -- По умолчанию белый
                 
+                -- Меняем цвет, только если включен Visible Check (но линию не скрываем)
                 if Config.ESP.VisibleCheck then
                     local char = lineTarget.Parent
                     if char and char:FindFirstChildOfClass("Humanoid") then
                         if isVisible(char) then
-                            drawLine = true
-                            lineColor = Color3.fromRGB(0, 255, 0)
+                            lineColor = Color3.fromRGB(0, 255, 0) -- Зеленый
                         else
-                            drawLine = false
+                            lineColor = Color3.fromRGB(255, 0, 0) -- Красный (за стеной)
                         end
                     end
-                else
-                    drawLine = true
-                    lineColor = Color3.fromRGB(255, 255, 255)
                 end
                 
-                if drawLine then
-                    local l = Drawing.new("Line")
-                    l.Thickness = 1
-                    l.Color = lineColor
-                    l.From = screenCenter
-                    l.To = Vector2.new(targetPos.X, targetPos.Y)
-                    l.Visible = true
-                    task.delay(0.05, function() l:Remove() end)
-                end
+                local l = Drawing.new("Line")
+                l.Thickness = 1
+                l.Color = lineColor
+                l.From = screenCenter
+                l.To = Vector2.new(targetPos.X, targetPos.Y)
+                l.Visible = true
+                task.delay(0.05, function() l:Remove() end)
             end
         end
     end
